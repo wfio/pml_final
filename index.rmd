@@ -82,13 +82,21 @@ trainingSet <- final.train[inTrain, ]
 testingSet <- final.train[-inTrain, ]
 ```
 
+###Correlation Plot
+#####A simple correlation plot of the predictors was included using the corrplot library to give a visual representation of predictor correlation. A visual inspection shows that there appear to be positive correlations between belt sensor predictors and forearm predictors. Qualitatively, it appears that if your hip alignment is askew then it has a higher likelihood of skewing your overall performance. Interestintly, this is supported by the classification tree ('rpart') fancy plot shown below. However, the prediction output of that model, as you will read, is less than satisfactory.
+
 ```{r correlation plot}
 m <- cor(trainingSet[,1:48])
-corrplot(m, method = 'circle', title = 'Correlation Plot of Predictors', tl.col = 'black', tl.cex = .5)
+par(pin=c(4,4)) #(width, height) in inches
+par(mai=c(.5, .25, .25, .5))
+par(omi=c(0.25, 0.25, .5, 0.75)) #(bottom, left, top, right)  in inches
+par(cex = 0.7)
+corrplot(m, method = 'square', tl.col = 'black', tl.cex = .8, diag = FALSE)
+
 ```
 
 ###Model Selection 1 - Generalized Boosted Model ('gbm')
-#####We picked a general boosted model as our first model fit attempt to predict the quality of how well a user might perfor the dumbbell exercise. We'll fine tune the control of this model fit by specifying cross validation sampling, with k-folds = 5 and repeated sampling (1).
+#####We picked a general boosted model as our first model fit attempt to predict the quality of how well a user might perfor the dumbbell exercise. We'll fine tune the control of this model fit by specifying cross validation sampling, with k-folds = 3 and repeated sampling (1).
 
 ```{r gbm fit}
 if (file.exists('gbmFit.Rds')) 
@@ -96,7 +104,7 @@ if (file.exists('gbmFit.Rds'))
       gbmFit <- readRDS('gbmFit.Rds')
 } else {
   set.seed(3332) #set psuedo-randomization seed for reproducibility
-  fitControl <- trainControl(method = 'cv', number = 5
+  fitControl <- trainControl(method = 'cv', number = 3
                             , repeats = 1)
   fit.gbm <- train(classe ~ .
                    , data = trainingSet
@@ -120,7 +128,7 @@ cm.gbm$table;cm.gbm$overall[1]
 ```
 
 ###Model Selection 2 - RPart
-#####The gbm performed extremely well and we'll attempt to fit another model using a classification tree an cross  validation as a comparison. In this approach we'll be using k = 5 folds (or nodes) of classification and prediction. What becomes apparent in the fancy plot is that it appears poor form in the belt_roll predictor either leads directly to a failed performance measure or to throw the forearm predictor off.
+#####The gbm performed extremely well and we'll attempt to fit another model using a classification tree an cross  validation as a comparison. In this approach we'll be using k = 3 folds (or nodes) of classification and prediction. What becomes apparent in the fancy plot is that it appears poor form in the belt_roll predictor either leads directly to a failed performance measure or to throw the forearm predictor off.
 
 ```{r r part}
 set.seed(3334)

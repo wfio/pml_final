@@ -79,16 +79,23 @@ trainingSet <- final.train[inTrain, ]
 testingSet <- final.train[-inTrain, ]
 ```
 
+###Correlation Plot
+#####A simple correlation plot of the predictors was included using the corrplot library to give a visual representation of predictor correlation. A visual inspection shows that there appear to be positive correlations between belt sensor predictors and forearm predictors. Qualitatively, it appears that if your hip alignment is askew then it has a higher likelihood of skewing your overall performance. Interestintly, this is supported by the classification tree ('rpart') fancy plot shown below. However, the prediction output of that model, as you will read, is less than satisfactory.
+
 
 ```r
 m <- cor(trainingSet[,1:48])
-corrplot(m, method = 'circle', title = 'Correlation Plot of Predictors', tl.col = 'black', tl.cex = .5)
+par(pin=c(4,4)) #(width, height) in inches
+par(mai=c(.5, .25, .25, .5))
+par(omi=c(0.25, 0.25, .5, 0.75)) #(bottom, left, top, right)  in inches
+par(cex = 0.7)
+corrplot(m, method = 'square', tl.col = 'black', tl.cex = .8, diag = FALSE)
 ```
 
 ![](index_files/figure-html/correlation plot-1.png)
 
 ###Model Selection 1 - Generalized Boosted Model ('gbm')
-#####We picked a general boosted model as our first model fit attempt to predict the quality of how well a user might perfor the dumbbell exercise. We'll fine tune the control of this model fit by specifying cross validation sampling, with k-folds = 5 and repeated sampling (1).
+#####We picked a general boosted model as our first model fit attempt to predict the quality of how well a user might perfor the dumbbell exercise. We'll fine tune the control of this model fit by specifying cross validation sampling, with k-folds = 3 and repeated sampling (1).
 
 
 ```r
@@ -97,7 +104,7 @@ if (file.exists('gbmFit.Rds'))
       gbmFit <- readRDS('gbmFit.Rds')
 } else {
   set.seed(3332) #set psuedo-randomization seed for reproducibility
-  fitControl <- trainControl(method = 'cv', number = 5
+  fitControl <- trainControl(method = 'cv', number = 3
                             , repeats = 1)
   fit.gbm <- train(classe ~ .
                    , data = trainingSet
@@ -117,30 +124,30 @@ fit.gbm
 ##     5 classes: 'A', 'B', 'C', 'D', 'E' 
 ## 
 ## No pre-processing
-## Resampling: Cross-Validated (5 fold) 
-## Summary of sample sizes: 10989, 10989, 10991, 10991, 10988 
+## Resampling: Cross-Validated (3 fold) 
+## Summary of sample sizes: 9158, 9158, 9158 
 ## Resampling results across tuning parameters:
 ## 
 ##   interaction.depth  n.trees  Accuracy   Kappa      Accuracy SD
-##   1                   50      0.7487797  0.6814692  0.012553881
-##   1                  100      0.8193195  0.7713589  0.004578193
-##   1                  150      0.8528800  0.8138425  0.005165753
-##   2                   50      0.8559378  0.8175413  0.005629516
-##   2                  100      0.9082040  0.8838205  0.004860416
-##   2                  150      0.9314987  0.9133216  0.001664394
-##   3                   50      0.8943730  0.8662982  0.002149120
-##   3                  100      0.9405981  0.9248392  0.002387848
-##   3                  150      0.9605443  0.9500782  0.001762625
+##   1                   50      0.7508190  0.6838301  0.007593509
+##   1                  100      0.8175002  0.7690349  0.001981606
+##   1                  150      0.8522967  0.8131342  0.006232043
+##   2                   50      0.8588484  0.8212302  0.007257373
+##   2                  100      0.9056563  0.8806184  0.007100139
+##   2                  150      0.9298246  0.9112071  0.006767688
+##   3                   50      0.8949552  0.8670349  0.004212121
+##   3                  100      0.9399432  0.9240055  0.007396241
+##   3                  150      0.9581422  0.9470399  0.006193660
 ##   Kappa SD   
-##   0.015880824
-##   0.005746434
-##   0.006650737
-##   0.007165414
-##   0.006142718
-##   0.002086873
-##   0.002735215
-##   0.003038023
-##   0.002236623
+##   0.009340729
+##   0.002447725
+##   0.007848679
+##   0.009120324
+##   0.008961040
+##   0.008582996
+##   0.005318817
+##   0.009383818
+##   0.007857363
 ## 
 ## Tuning parameter 'shrinkage' was held constant at a value of 0.1
 ## 
@@ -170,20 +177,20 @@ cm.gbm$table;cm.gbm$overall[1]
 ```
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 1650   14    5    2    3
-##          B   33 1081   20    4    1
-##          C    0   27  985   12    2
-##          D    1    1   28  930    4
-##          E    2   18    6   20 1036
+##          A 1649   12    6    4    3
+##          B   33 1077   26    2    1
+##          C    0   26  988   10    2
+##          D    1    0   35  927    1
+##          E    3   17    4   21 1037
 ```
 
 ```
 ##  Accuracy 
-## 0.9655055
+## 0.9648258
 ```
 
 ###Model Selection 2 - RPart
-#####The gbm performed extremely well and we'll attempt to fit another model using a classification tree an cross  validation as a comparison. In this approach we'll be using k = 5 folds (or nodes) of classification and prediction. What becomes apparent in the fancy plot is that it appears poor form in the belt_roll predictor either leads directly to a failed performance measure or to throw the forearm predictor off.
+#####The gbm performed extremely well and we'll attempt to fit another model using a classification tree an cross  validation as a comparison. In this approach we'll be using k = 3 folds (or nodes) of classification and prediction. What becomes apparent in the fancy plot is that it appears poor form in the belt_roll predictor either leads directly to a failed performance measure or to throw the forearm predictor off.
 
 
 ```r
@@ -253,14 +260,14 @@ cm.final$table;cm.final$overall[1]
 ```
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 1650   14    5    2    3
-##          B   33 1081   20    4    1
-##          C    0   27  985   12    2
-##          D    1    1   28  930    4
-##          E    2   18    6   20 1036
+##          A 1649   12    6    4    3
+##          B   33 1077   26    2    1
+##          C    0   26  988   10    2
+##          D    1    0   35  927    1
+##          E    3   17    4   21 1037
 ```
 
 ```
 ##  Accuracy 
-## 0.9655055
+## 0.9648258
 ```
