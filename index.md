@@ -9,6 +9,24 @@ require('corrplot')
 require('gbm')
 ```
 
+###Background & Introduction
+#####Using physical fitness trackers like Fitbit and Nike+ now make it possible to collect a large amount of data about personal activity. These type of devices are part of the quantified self movement; a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+#####This project attempts to make predictions about the quality of how well an exercise might be performed based upon data and research obtained and conducted by Pontifical Catholic University of Rio de Janeiro department of Informatics and the School of Computing and Communication, Lancaster University in the UK.
+
+#####In this project, we will use data derived from accelerometers on the belt, forearm, arm, and dumbell of 6 participants in the study (cited below). Those participants were asked to perform barbell lifts correctly and incorrectly in 5 different ways ('classe'). The five ways are exactly according to the specification: 
+
+1. (Class A) corresponds to correct performance
+2. (Class B) throwing the elbows to the front;
+3. (Class C) lifting the dumbbell only halfway;
+4. (Class D) lowering the dumbbell only halfway;
+5. (Class E) and throwing the hips to the front;
+
+#####The goal of this project is to predict the manner in which 20 (provided) test cases will occur, i.e., Class A to E. The prediction will occur using the final model fit that we believe will best predict on the provided test data set for twenty (20) users. 
+
+#####More information regarding the original study is available from the website here: http://groupware.les.inf.puc-rio.br/har.
+
+
 ```r
 if(!file.exists("pml-training.csv")){
    download.file(url="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",
@@ -20,98 +38,75 @@ if(!file.exists("pml-testing.csv")){
 }
 ```
 
-###Background & Introduction
-#####Using physical fitness trackers like Fitbit and Nike+ now make it 
-possible to collect a large amount of data about personal activity. These 
-type of devices are part of the quantified self movement – a group of 
-enthusiasts who take measurements about themselves regularly to improve their 
-health, to find patterns in their behavior, or because they are tech geeks. 
-One thing that people regularly do is quantify how much of a particular 
-activity they do, but they rarely quantify how well they do it.
+###Loading the data
+#####The training set will be used and partitioned to create a training set and testing for cross validation of the model fits. The testing set file ('pml-testing.csv') provided in the course will be used exclusively for the final model fit and prediction.
 
-This project attempts to make predictions about the quality of how well an 
-exercise might be performed based upon data and research obtained and 
-conducted by Pontifical Catholic University of Rio de Janeiro department of 
-Informatics and the School of Computing and Communication, Lancaster 
-University in the UK.
-
-In this project, we will be to use data from accelerometers on the belt, 
-forearm, arm, and dumbell of 6 participant Those participants were asked to 
-perform barbell lifts correctly and incorrectly in 5 different ways 
-('classe'). The five ways are exactly according to the specification (Class 
-A), throwing the elbows to the front (Class B), lifting the dumbbell only 
-halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing 
-the hips to the front (Class E). Only Class A corresponds to correct 
-performance. The goal of this project is to predict the manner in which they 
-did the exercise, i.e., Class A to E. More information is available from the 
-website here: http://groupware.les.inf.puc-rio.br/har. We are using the whole 
-dataset as opposed to the pre-determined training and testing sets provided 
-in the course.
-
-####Loading the data
-#####We read in the data file accounting for NA-strings and remove columns of 
-data that aren't useful for performing any of the analyses we are interested 
-in; namely, columns 1-7 are identifying, time series or window variables that 
-won't provide use for feature selection in building the model.
 
 ```r
-dat.test <- read.csv('pml-testing.csv', na.strings = c('', 'NA'))
 dat.train <- read.csv('pml-training.csv', na.strings = c('', 'NA'))
+dat.quiz <- read.csv('pml-testing.csv', na.strings = c('', 'NA'))
 ```
 
-#####Identify columns that have complete cases and only keep those with 
-complete cases. The first six columns are not useful for our reproduction nor are the incomplete columns, which are primarily summary statistics.
+#####Identify columns that have complete cases and only keep those with complete cases. The first six columns are not useful for our reproduction nor are the incomplete columns, which are primarily summary statistics.
 
 
 ```r
-dat.test.1 <- dat.test[,colnames(dat.test)[complete.cases(t(dat.test))]] 
-#ditch NA cols
-dat.test.1.1 <- dat.test.1[, 8:60] #remove useless variables (cols 1:7)
-new.test <- dat.test.1.1[, 
-    !grepl("^amplitude|^kurtosis|^skewness|^avg|^cvtd_timestamp|^max|^min
-    |^new_window|^raw_timestamp|^stddev|^var|^user_name|X|^total"
-    ,x=names(dat.test.1.1))]
+#Process the training test set
 dat.train.1 <- dat.train[,colnames(dat.train)[complete.cases(t(dat.train))]] 
-#ditch NA cols
-dat.train.1.1 <- dat.train.1[, 8:60] #remove useless variables (cols 1:7)
-new.train <- dat.train.1.1[, 
+dat.train.2 <- dat.train.1[, 8:60] #remove useless variables (cols 1:7)
+final.train <- dat.train.2[, 
     !grepl("^amplitude|^kurtosis|^skewness|^avg|^cvtd_timestamp|^max|^min
     |^new_window|^raw_timestamp|^stddev|^var|^user_name|X|^total"
-    ,x=names(dat.train.1.1))]
-rm(dat.test, dat.train, dat.test.1, dat.train.1, dat.test.1.1, dat.train.1.1)
+    ,x=names(dat.train.2))]
+
+#Process the quiz test set
+dat.quiz <- dat.quiz[,colnames(dat.quiz)[complete.cases(t(dat.quiz))]] 
+#ditch NA cols
+dat.quiz.1 <- dat.quiz[, 8:60] #remove useless variables (cols 1:7)
+final.quiz <- dat.quiz.1[, 
+    !grepl("^amplitude|^kurtosis|^skewness|^avg|^cvtd_timestamp|^max|^min
+    |^new_window|^raw_timestamp|^stddev|^var|^user_name|X|^total"
+    ,x=names(dat.quiz.1))]
+
+rm(dat.quiz, dat.train, dat.quiz.1, dat.train.1, dat.train.2)
 ```
 
 
 ```r
 set.seed(3331) #set psuedo-randomization seed for reproducibility
-inTrain <- createDataPartition(new.train$classe, p = .70, list = FALSE)
-training <- new.train[inTrain, ]
-testing <- new.train[-inTrain, ]
-m <- cor(training[,1:48])
-corrplot(m, method = 'circle')
+inTrain <- createDataPartition(final.train$classe, p = .70, list = FALSE)
+trainingSet <- final.train[inTrain, ]
+testingSet <- final.train[-inTrain, ]
 ```
-
-![](index_files/figure-html/setting up the data for model building-1.png)
-####Model Selection 1 - Generalized Boosted Model
-#####We picked a general boosted model as our first model fit attempt to 
-predict the quality of how well a user might perfor the dumbbell exercise.
 
 
 ```r
-if (file.exists('gbmFit1.Rds')) 
+m <- cor(trainingSet[,1:48])
+corrplot(m, method = 'circle', title = 'Correlation Plot of Predictors', tl.col = 'black', tl.cex = .5)
+```
+
+![](index_files/figure-html/correlation plot-1.png)
+
+###Model Selection 1 - Generalized Boosted Model ('gbm')
+#####We picked a general boosted model as our first model fit attempt to predict the quality of how well a user might perfor the dumbbell exercise. We'll fine tune the control of this model fit by specifying cross validation sampling, with k-folds = 5 and repeated sampling (1).
+
+
+```r
+if (file.exists('gbmFit.Rds')) 
     {
-      gbmFit1 <- readRDS('gbmFit1.Rds')
+      gbmFit <- readRDS('gbmFit.Rds')
 } else {
   set.seed(3332) #set psuedo-randomization seed for reproducibility
-  fitControl <- trainControl(method = 'cv', number = 3
+  fitControl <- trainControl(method = 'cv', number = 5
                             , repeats = 1)
-  gbmFit1 <- train(classe ~ .
-                   , data = training
+  fit.gbm <- train(classe ~ .
+                   , data = trainingSet
                    , method = 'gbm'
                    , trControl = fitControl
                    , verbose = FALSE)
-  } 
-gbmFit1
+  saveRDS(fit.gbm, file = 'gbmFit.Rds')
+} 
+fit.gbm
 ```
 
 ```
@@ -122,30 +117,30 @@ gbmFit1
 ##     5 classes: 'A', 'B', 'C', 'D', 'E' 
 ## 
 ## No pre-processing
-## Resampling: Cross-Validated (3 fold) 
-## Summary of sample sizes: 9158, 9158, 9158 
+## Resampling: Cross-Validated (5 fold) 
+## Summary of sample sizes: 10989, 10989, 10991, 10991, 10988 
 ## Resampling results across tuning parameters:
 ## 
 ##   interaction.depth  n.trees  Accuracy   Kappa      Accuracy SD
-##   1                   50      0.7508190  0.6838301  0.007593509
-##   1                  100      0.8175002  0.7690349  0.001981606
-##   1                  150      0.8522967  0.8131342  0.006232043
-##   2                   50      0.8588484  0.8212302  0.007257373
-##   2                  100      0.9056563  0.8806184  0.007100139
-##   2                  150      0.9298246  0.9112071  0.006767688
-##   3                   50      0.8949552  0.8670349  0.004212121
-##   3                  100      0.9399432  0.9240055  0.007396241
-##   3                  150      0.9581422  0.9470399  0.006193660
+##   1                   50      0.7487797  0.6814692  0.012553881
+##   1                  100      0.8193195  0.7713589  0.004578193
+##   1                  150      0.8528800  0.8138425  0.005165753
+##   2                   50      0.8559378  0.8175413  0.005629516
+##   2                  100      0.9082040  0.8838205  0.004860416
+##   2                  150      0.9314987  0.9133216  0.001664394
+##   3                   50      0.8943730  0.8662982  0.002149120
+##   3                  100      0.9405981  0.9248392  0.002387848
+##   3                  150      0.9605443  0.9500782  0.001762625
 ##   Kappa SD   
-##   0.009340729
-##   0.002447725
-##   0.007848679
-##   0.009120324
-##   0.008961040
-##   0.008582996
-##   0.005318817
-##   0.009383818
-##   0.007857363
+##   0.015880824
+##   0.005746434
+##   0.006650737
+##   0.007165414
+##   0.006142718
+##   0.002086873
+##   0.002735215
+##   0.003038023
+##   0.002236623
 ## 
 ## Tuning parameter 'shrinkage' was held constant at a value of 0.1
 ## 
@@ -156,70 +151,59 @@ gbmFit1
 ```
 
 ```r
-g <- ggplot(gbmFit1)
-g
+ggplot(fit.gbm)
 ```
 
-![](index_files/figure-html/gbm-1.png)
+![](index_files/figure-html/gbm fit-1.png)
 
-####Cross Validation and Accuracy of Model One
-#####We noted significant accuracy in the training model fit as well as 
-significant accuracy in the cross-validation of the testing dataset at ~ 96%, which leaves what appears to be an extremely low out of sample error rating < 5%. The confusion matrix shows a relatively low mis-classification rate on 
-the predictions. In general, the misclassifications appeared to be around 1%.
+###Cross Validation and Accuracy of Model One
+#####We noted solid accuracy in the training model fit as well as accuracy in the cross-validation of the testing dataset at ~ 96%, with an out of sample error rating < 5%. The confusion matrix shows a relatively low mis-classification rate on the predictions. In general, the misclassifications appeared to be around 1%.
 
 
 ```r
-pred.gbm <- predict(gbmFit1, testing)
-cm.gbm <- confusionMatrix(testing$classe, pred.gbm)
+set.seed(3333)
+pred.gbm <- predict(fit.gbm, testingSet)
+cm.gbm <- confusionMatrix(testingSet$classe, pred.gbm)
 cm.gbm$table;cm.gbm$overall[1]
 ```
 
 ```
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 1649   12    6    4    3
-##          B   33 1077   26    2    1
-##          C    0   26  988   10    2
-##          D    1    0   35  927    1
-##          E    3   17    4   21 1037
+##          A 1650   14    5    2    3
+##          B   33 1081   20    4    1
+##          C    0   27  985   12    2
+##          D    1    1   28  930    4
+##          E    2   18    6   20 1036
 ```
 
 ```
 ##  Accuracy 
-## 0.9648258
+## 0.9655055
 ```
 
-####Model Selection 2 - RPart
-#####The gbm performed extremely well and we'll attempt to fit another model 
-using a classification tree an cross  validation as a comparison. In this 
-approach we'll be using k = 5  folders (or nodes) of classification and 
-prediction. What becomes aparenet in the fancy plot is that it appears poor form in the belt_roll predictor either leads directly to a failed performance measure or to throw the forearm predictor off.
+###Model Selection 2 - RPart
+#####The gbm performed extremely well and we'll attempt to fit another model using a classification tree an cross  validation as a comparison. In this approach we'll be using k = 5 folds (or nodes) of classification and prediction. What becomes apparent in the fancy plot is that it appears poor form in the belt_roll predictor either leads directly to a failed performance measure or to throw the forearm predictor off.
 
 
 ```r
-fitControl.2 <- trainControl(method = 'cv', number = 5)
-fit.rpart <- train(classe ~ ., data = training, method = "rpart", trControl = fitControl.2)
-f <- fancyRpartPlot(fit.rpart$finalModel)
+set.seed(3334)
+fitControl.2 <- trainControl(method = 'cv', number = 3, repeats = 1)
+fit.rpart <- train(classe ~ ., data = trainingSet
+                   , method = "rpart", trControl = fitControl.2)
+fancyRpartPlot(fit.rpart$finalModel)
 ```
 
 ![](index_files/figure-html/r part-1.png)
 
-```r
-f
-```
-
-```
-## NULL
-```
-
 ####Cross validation and accuracy of model 2
-#####The rpart model doesn't perform as well with only ~ 49% accuracy or out 
-of sample error rate exceeding 51%. Therefore, we wil use model #1 for the final exam.
+#####The rpart model doesn't perform as well with only ~ 49% accuracy or out of sample error rate exceeding 51%. Therefore, we wil use model #1 for the final exam.
 
 
 ```r
-pred.rp <- predict(fit.rpart, testing)
-cm.rp <- confusionMatrix(testing$classe, pred.rp)
+set.seed(3335)
+pred.rp <- predict(fit.rpart, testingSet)
+cm.rp <- confusionMatrix(testingSet$classe, pred.rp)
 cm.rp$table;cm.rp$overall[1]
 ```
 
@@ -251,49 +235,32 @@ cm.rp$table;cm.rp$overall[1]
 
 
 ```r
-final.fit <- predict(gbmFit1, newdata = new.test)
-confusionMatrix(testing$classe, predict(gbmFit1, testing))
-```
-
-```
-## Confusion Matrix and Statistics
-## 
-##           Reference
-## Prediction    A    B    C    D    E
-##          A 1649   12    6    4    3
-##          B   33 1077   26    2    1
-##          C    0   26  988   10    2
-##          D    1    0   35  927    1
-##          E    3   17    4   21 1037
-## 
-## Overall Statistics
-##                                           
-##                Accuracy : 0.9648          
-##                  95% CI : (0.9598, 0.9694)
-##     No Information Rate : 0.2865          
-##     P-Value [Acc > NIR] : < 2.2e-16       
-##                                           
-##                   Kappa : 0.9555          
-##  Mcnemar's Test P-Value : 2.037e-10       
-## 
-## Statistics by Class:
-## 
-##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity            0.9781   0.9514   0.9330   0.9616   0.9933
-## Specificity            0.9940   0.9870   0.9921   0.9925   0.9907
-## Pos Pred Value         0.9851   0.9456   0.9630   0.9616   0.9584
-## Neg Pred Value         0.9912   0.9884   0.9854   0.9925   0.9985
-## Prevalence             0.2865   0.1924   0.1799   0.1638   0.1774
-## Detection Rate         0.2802   0.1830   0.1679   0.1575   0.1762
-## Detection Prevalence   0.2845   0.1935   0.1743   0.1638   0.1839
-## Balanced Accuracy      0.9861   0.9692   0.9625   0.9770   0.9920
-```
-
-```r
+set.seed(3336)
+final.fit <- predict(fit.gbm, newdata = final.quiz)
+cm.final <- confusionMatrix(testingSet$classe, predict(fit.gbm, testingSet))
 final.fit
 ```
 
 ```
 ##  [1] B A B A A E D B A A B C B A E E A B B B
 ## Levels: A B C D E
+```
+
+```r
+cm.final$table;cm.final$overall[1]
+```
+
+```
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1650   14    5    2    3
+##          B   33 1081   20    4    1
+##          C    0   27  985   12    2
+##          D    1    1   28  930    4
+##          E    2   18    6   20 1036
+```
+
+```
+##  Accuracy 
+## 0.9655055
 ```
